@@ -16,6 +16,7 @@ class MyBot(BaseAgent):
         self.is_zombie = False
 
     def get_output(self, packet: GameTickPacket) -> SimpleControllerState:
+
         ball_location = Vec3(packet.game_ball.physics.location)
         ball_velocity = Vec3(packet.game_ball.physics.velocity)
 
@@ -25,17 +26,17 @@ class MyBot(BaseAgent):
         team = packet.game_cars[self.index].team
         my_car = packet.game_cars[self.index]
         car_location = Vec3(my_car.physics.location)
-
+  
         car_to_ball = ball_location - car_location
         car_ball_distance = distance2D(ball_location, car_location)
         # Find the direction of our car using the Orientation class
         car_orientation = Orientation(my_car.physics.rotation)
         car_direction = car_orientation.forward
 
-        ball_future = Vec3(clamp(ball_location.x + ball_velocity.x * (car_ball_distance / 1500),-4096,4096),clamp(ball_location.y + ball_velocity.y * (car_ball_distance / 1500),-5120,5120),max(ball_location.z + ball_velocity.z * (car_ball_distance / 1500),-ball_location.z))
-        print(f"car_ball_distance: {car_ball_distance}")
-        print(f"ball_future: {ball_future}")
-        print(f"ball_location: {ball_location}")
+        ball_future = Vec3(clamp(ball_location.x + ball_velocity.x * (car_ball_distance / 2000),-4096,4096),clamp(ball_location.y + ball_velocity.y * (car_ball_distance / 1500),-5020,5020),max(ball_location.z + ball_velocity.z * (car_ball_distance / 1500),-ball_location.z))
+        # print(f"car_ball_distance: {car_ball_distance}")
+        # print(f"ball_future: {ball_future}")
+        # print(f"ball_location: {ball_location}")
         car_to_future = ball_future - car_location
         car_ball_future = distance2D(ball_future, car_location)
 
@@ -43,6 +44,7 @@ class MyBot(BaseAgent):
         team_goal = Vec3(0, -5120, 0) if not team == 1 else Vec3(0, 5120, 0)
         car_to_own_goal = team_goal - car_location
         ball_to_goal = distance2D(ball_future, team_goal)
+
         #print(ball_to_goal)
 
         steer_correction_radians = find_correction(car_direction, car_to_future)
@@ -64,6 +66,14 @@ class MyBot(BaseAgent):
         except:
             pass
 
+        distance_to_use = -200 if self.team == 0 else 200
+
+        if ball_future.y < car_location.y - distance_to_use and ball_to_goal > 2500:
+            steer_correction_radians = find_correction(car_direction, car_to_own_goal)
+            heading_back = True
+        else:
+            heading_back = False
+
         if steer_correction_radians > 0.1:
             # Positive radians in the unit circle is a turn to the left.
             turn = -1.0  # Negative value for a turn to the left.
@@ -75,7 +85,7 @@ class MyBot(BaseAgent):
             turn = 0
             action_display = "Go Forward"
 
-        if abs(steer_correction_radians) > .8 and abs(steer_correction_radians) < (pi - 0.8):
+        if abs(steer_correction_radians) > .7 and abs(steer_correction_radians) < (pi - 0.8):
             self.controller_state.handbrake = 1
         else:
             self.controller_state.handbrake = 0
@@ -87,15 +97,15 @@ class MyBot(BaseAgent):
             else:
                 self.controller_state.boost = 0
             speed = min(speed, 1)
-            if abs(steer_correction_radians) > (pi * 5 / 8):
-                speed = max(((speed * -1) * car_ball_future/100) / 2,-1)
+            if abs(steer_correction_radians) > (pi * 4 / 8):
+                speed = max(((speed * -1) * car_ball_future/100) / 2,-1) if not heading_back else -1
                 turn = turn * -1
         else:
             speed = min(distance2D(team_goal, car_location) // 500, 1)
         #print(speed)
         #print(speed)
 
-        if 1000 > ball_future.z > 200 and car_ball_distance < 500:
+        if 500 > ball_future.z > 200 and car_ball_distance < 500:
             self.controller_state.jump = 1
         else:
             self.controller_state.jump = 0
